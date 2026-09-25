@@ -1,12 +1,11 @@
 SELECT b.id,a.id AS order_id,
 a.order_id AS order_name,
-
 a.created_at AS order_date,
 a.delivery_at AS completed_date,
 a.status AS order_status, 
 case
-  when UPPER(a.customer_note) LIKE '%THU COD%' then 'Sale - Exchange'
-  ELSE 'Sale - Sale' end AS type_lv2,
+WHEN UPPER(a.customer_note) LIKE '%%THU COD%%' then 'Sale - Exchange'
+ELSE 'Sale - Sale' end AS type_lv2,
 'Sale'  AS type_lv1,
 a.customer_id AS origin_customer_id,
 a.customer_name AS customer_id,
@@ -15,13 +14,13 @@ a.uic_name AS sale_man,
 '' as location_hrv_id,
 a.channel  as location_name,
 case 
-        when a.channel like 'Shopee%' then 50001
-  when a.channel IN ( 'Shopee2') then 50004
-  when a.channel IN ('Lazada') then 50002
-  when a.channel IN ('Lazada2') then 50005
-  when a.channel IN ('Tiki') then 50003
-  when a.channel IN ('Tiktok', 'Tiktok2') then 60001
-  ELSE 00000 END AS channel_id,
+when a.channel IN ( 'Shopee') then 50001
+when a.channel IN ( 'Shopee2') then 50004
+when a.channel IN ('Lazada') then 50002
+when a.channel IN ('Lazada2') then 50005
+when a.channel IN ('Tiki') then 50003
+when a.channel IN ('Tiktok', 'Tiktok2') then 60001
+ELSE 0 END AS channel_id,
 b.old_sku as model_sku,
 c.product_variant_id as variant_id ,
 c.barcode,
@@ -45,10 +44,12 @@ a.delivery_at AS warehouse_date,
 'ecom_order_inform' AS data_source,
 a.updated_at
 FROM ecom_order a
-  INNER JOIN ecom_order_detail  b ON a.order_id = b.order_id
-  INNER JOIN ecom_order_detail c ON b.id = c.parent_id
-WHERE ( a.created_at >= NOW() - INTERVAL 5 DAY
- or a.updated_at >= NOW() - INTERVAL 5 DAY )
+INNER JOIN ecom_order_detail  b ON a.order_id = b.order_id
+INNER JOIN ecom_order_detail c ON b.id = c.parent_id
+WHERE (
+    DATE(a.created_at) = %s
+    OR DATE(a.updated_at) = %s
+)
 AND c.id IS NOT NULL
-AND c.canceled = 0 
+AND c.canceled = 0
 AND a.status NOT IN(-1)

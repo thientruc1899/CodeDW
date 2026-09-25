@@ -60,7 +60,7 @@ RAW = f"{RAW_SCHEMA}.{RAW_TABLE}"
 FINAL = f"{FINAL_SCHEMA}.{FINAL_TABLE}"
 
 # Credentials live in .env next to this file (see .env.example). Never commit .env.
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv()
 
 
 def env(key: str, default: str | None = None) -> str:
@@ -90,8 +90,8 @@ POSTGRES = dict(
 # Output columns of SOURCE_SQL, in order, with the Postgres type used
 # for both destination tables.
 COLUMNS = [
-    ("id", "integer"),
-    ("order_id", "integer"),
+    ("id", "text"),
+    ("order_id", "text"),
     ("order_name", "text"),
     ("order_date", "timestamp"),
     ("completed_date", "timestamp"),
