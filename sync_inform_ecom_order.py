@@ -4,7 +4,7 @@ Daily sync: MariaDB -> PostgreSQL (order-line grain)
 
     ibasicco_aftm2.ecom_order + ecom_order_detail
         -> staging.stg_inform_ecom_order_line   (raw, append-only, duplicates OK)
-        -> staging.stg_ecom_order_line_final    (1 row per line id, kept current)
+        -> public.ecom_order_final              (1 row per line id, kept current)
 
 Grain: 1 row = 1 order line (id = ecom_order_detail b.id).
 
@@ -33,25 +33,58 @@ COLUMNS below). Source schema check, if needed:
     ORDER BY table_name, ordinal_position;
 
 Setup:
-    pip install pymysql psycopg2-binary
+    pip install pymysql psycopg2-binary python-dotenv
+    cp .env.example .env    # then fill in credentials
     python3 sync_ecom_order_line.py               # yesterday
     python3 sync_ecom_order_line.py 2026-09-20    # specific date (backfill)
 """
 
+import os
 import sys
 from datetime import date, timedelta
+from pathlib import Path
 
 import pymysql
 import psycopg2
+from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 
 # ---------------- CONFIG ----------------
-DEST_SCHEMA = "staging"
+RAW_SCHEMA = "staging"
 RAW_TABLE = "stg_inform_ecom_order_line"
-FINAL_TABLE = "stg_ecom_order_line_final"
+FINAL_SCHEMA = "public"
+FINAL_TABLE = "ecom_order_final"
 SYNC_FINAL = True  # set False to only append to the raw table
 
+RAW = f"{RAW_SCHEMA}.{RAW_TABLE}"
+FINAL = f"{FINAL_SCHEMA}.{FINAL_TABLE}"
 
+# Credentials live in .env next to this file (see .env.example). Never commit .env.
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
+
+def env(key: str, default: str | None = None) -> str:
+    value = os.getenv(key, default)
+    if value is None or value == "":
+        sys.exit(f"Missing {key} — set it in .env")
+    return value
+
+
+MARIADB = dict(
+    host=env("INFORM_HOST"),
+    port=int(env("INFORM_PORT", "3306")),
+    user=env("INFORM_USER"),
+    password=env("INFORM_PASSWORD"),
+    database=env("INFORM_DB"),
+)
+
+POSTGRES = dict(
+    host=env("DW_HOST"),
+    port=int(env("DW_PORT", "5432")),
+    user=env("DW_USER"),
+    password=env("DW_PASSWORD"),
+    dbname=env("DW_DB"),
+)
 # -----------------------------------------
 
 # Output columns of SOURCE_SQL, in order, with the Postgres type used
@@ -168,9 +201,9 @@ WHERE DATE(COALESCE(updated_at, created_at)) = %s
 """
 
 
-def ddl(table: str) -> str:
+def ddl(qualified_table: str) -> str:
     cols = ",\n".join(f'    "{c}" {t}' for c, t in COLUMNS)
-    return f"CREATE TABLE IF NOT EXISTS {DEST_SCHEMA}.{table} (\n{cols}\n)"
+    return f"CREATE TABLE IF NOT EXISTS {qualified_table} (\n{cols}\n)"
 
 
 def main() -> None:
@@ -204,36 +237,37 @@ def main() -> None:
     try:
         with pg_conn:
             with pg_conn.cursor() as cur:
-                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DEST_SCHEMA}")
-                cur.execute(ddl(RAW_TABLE))
-                cur.execute(ddl(FINAL_TABLE))
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {RAW_SCHEMA}")
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {FINAL_SCHEMA}")
+                cur.execute(ddl(RAW))
+                cur.execute(ddl(FINAL))
 
                 # 2a. Raw table: append only
                 if values:
                     execute_values(
                         cur,
-                        f"INSERT INTO {DEST_SCHEMA}.{RAW_TABLE} ({COL_LIST}) VALUES %s",
+                        f"INSERT INTO {RAW} ({COL_LIST}) VALUES %s",
                         values,
                         page_size=1000,
                     )
-                    print(f"Inserted {len(values)} rows into {DEST_SCHEMA}.{RAW_TABLE}")
+                    print(f"Inserted {len(values)} rows into {RAW}")
 
                 # 2b. Final table: delete touched orders, insert fresh snapshot
                 if SYNC_FINAL:
                     if touched_order_ids:
                         cur.execute(
-                            f'DELETE FROM {DEST_SCHEMA}.{FINAL_TABLE} WHERE "order_id" = ANY(%s)',
+                            f'DELETE FROM {FINAL} WHERE "order_id" = ANY(%s)',
                             (touched_order_ids,),
                         )
-                        print(f"Deleted {cur.rowcount} rows from {DEST_SCHEMA}.{FINAL_TABLE}")
+                        print(f"Deleted {cur.rowcount} rows from {FINAL}")
                     if values:
                         execute_values(
                             cur,
-                            f"INSERT INTO {DEST_SCHEMA}.{FINAL_TABLE} ({COL_LIST}) VALUES %s",
+                            f"INSERT INTO {FINAL} ({COL_LIST}) VALUES %s",
                             values,
                             page_size=1000,
                         )
-                        print(f"Inserted {len(values)} rows into {DEST_SCHEMA}.{FINAL_TABLE}")
+                        print(f"Inserted {len(values)} rows into {FINAL}")
     finally:
         pg_conn.close()
 
