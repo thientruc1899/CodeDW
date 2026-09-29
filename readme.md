@@ -3,29 +3,31 @@
 ## 1. Project Structure
 
 ```text
-project/
+├── code/
+│   ├── __init__.py
+│   └── sync_inform_order.py
+│
+├── flow/
+│   └── order_etl_flow.md
 │
 ├── helper/
+│   ├── __pycache__/
 │   └── class_resource.py
-│       # Database connection
-│       # Pull data by parameter
-│       # Insert data into PostgreSQL
+│
+├── sample/
+│   └── sync_sample.py
 │
 ├── sql/
-│   ├── create_stag_table.sql
-│   ├── extract_data.sql
-│   └── load_fact_data.sql
 │
-├── sync_inform_order.py
-│   # Main orchestration
-│
+├── .gitignore
+├── readme.md
 └── .env
     # Database credentials
 ```
 
 
 
-## 2. class_resource Logic
+## 2. Class Resource Logic
 
 `class_resource.py` is the shared resource layer between the sync script and databases.
 
