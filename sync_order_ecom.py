@@ -34,18 +34,7 @@ PG_CONFIG = {
 }
 
 
-COLUMNS = [
-    "id","order_id","order_name","order_date","completed_date",
-    "order_status","type_lv2","type_lv1","origin_customer_id",
-    "customer_id","customer_info","sale_man","location_hrv_id",
-    "location_name","channel_id","model_sku","variant_id",
-    "barcode","promotion_name","partner_discount","vat_contract",
-    "vat_current","qty_ordered","qty_delivered","gross_revenue",
-    "net_revenue_bf_coupon","net_revenue","net_revenue_actual",
-    "coupon_amount","note","warehouse_id","warehouse_name",
-    "warehouse_status","warehouse_date","return_name",
-    "data_source","updated_at"
-]
+
 
 COL_LIST = ",".join(f'"{c}"' for c in COLUMNS)
 
