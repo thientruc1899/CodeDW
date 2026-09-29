@@ -31,37 +31,16 @@ flowchart LR
 
 ## Flow Summary
 
-  --------------------------------------------------------------------------------------
-  Layer                   Table                                  Purpose
-  ----------------------- -------------------------------------- -----------------------
-  Source                  `ecom_order`                           Order source data in
-                                                                 MariaDB
+| Layer | Table | Purpose |
+|---|---|---|
+| Source | `ecom_order` | Order source data in MariaDB |
+| Source | `ecom_order_detail` | Order-detail source data in MariaDB |
+| RAW Staging | `stg_inform_ecom_order` | Append-only order history; duplicate `id` values are allowed |
+| RAW Staging | `stg_inform_ecom_order_detail` | Append-only order-detail history; duplicate `id` values are allowed |
+| Final Snapshot | `final_inform_ecom_order` | Latest order record per `id`, using `updated_at DESC`, then `loaded_at DESC` |
+| Final Snapshot | `final_inform_ecom_order_detail` | Latest order-detail record per `id`, using `loaded_at DESC` |
+| Business / Fact | `stg_ecom_order_final` | Join the two FINAL tables and apply business logic |
 
-  Source                  `ecom_order_detail`                    Order-detail source
-                                                                 data in MariaDB
-
-  RAW Staging             `stg_inform_ecom_order`                Append-only order
-                                                                 history; duplicate `id`
-                                                                 values are allowed
-
-  RAW Staging             `stg_inform_ecom_order_detail`         Append-only
-                                                                 order-detail history;
-                                                                 duplicate `id` values
-                                                                 are allowed
-
-  Final Snapshot          `final_inform_ecom_order`              Latest order record per
-                                                                 `id`, using
-                                                                 `updated_at DESC`, then
-                                                                 `loaded_at DESC`
-
-  Final Snapshot          `final_inform_ecom_order_detail`       Latest order-detail
-                                                                 record per `id`, using
-                                                                 `loaded_at DESC`
-
-  Business / Fact         `fact_ecom_order`                      Join the two FINAL
-                                                                 snapshots and apply
-                                                                 reporting/business
-                                                                 logic
   --------------------------------------------------------------------------------------
 
 ## Processing Logic
