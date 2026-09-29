@@ -30,15 +30,13 @@ flowchart LR
 ```
 
 ## Flow Summary
+## Flow Summary
 
 | Layer | Table | Purpose |
 |---|---|---|
-| Source | `ecom_order` | Order source data in MariaDB |
-| Source | `ecom_order_detail` | Order-detail source data in MariaDB |
-| RAW Staging | `stg_inform_ecom_order` | Append-only order history; duplicate `id` values are allowed |
-| RAW Staging | `stg_inform_ecom_order_detail` | Append-only order-detail history; duplicate `id` values are allowed |
-| Final Snapshot | `final_inform_ecom_order` | Latest order record per `id`, using `updated_at DESC`, then `loaded_at DESC` |
-| Final Snapshot | `final_inform_ecom_order_detail` | Latest order-detail record per `id`, using `loaded_at DESC` |
+| Source | `ecom_order`<br>`ecom_order_detail` | Order source data in MariaDB |
+| Staging | `stg_inform_ecom_order`<br>`stg_inform_ecom_order_detail` | Append-only order history<br>Duplicate `id` values are allowed |
+| Final Snapshot | `final_inform_ecom_order`<br>`final_inform_ecom_order_detail` | Latest order record per `id`, using `updated_at DESC`, then `loaded_at DESC`<br><br>Latest order-detail record per `id`, using `loaded_at DESC` |
 | Business / Fact | `stg_ecom_order_final` | Join the two FINAL tables and apply business logic |
 
   --------------------------------------------------------------------------------------
