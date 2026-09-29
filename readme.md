@@ -1,4 +1,4 @@
-# INFORM E-commerce Sync Flow
+#  Sync Flow
 
 ## 1. Project Structure
 
