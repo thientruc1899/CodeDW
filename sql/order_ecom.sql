@@ -1,6 +1,0 @@
-SELECT *
-FROM ecom_order a
-WHERE (
-    DATE(a.created_at) = %s
-    OR DATE(a.updated_at) = %s
-)

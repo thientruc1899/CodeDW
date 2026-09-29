@@ -1,80 +1,85 @@
-import os
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-import pymysql
-import psycopg2
-from dotenv import load_dotenv
-from psycopg2.extras import execute_values
+from helper.class_resource import Resource
 
-# ---------------- CONFIG ----------------
-# Credentials live in .env next to this file (see .env.example). Never commit .env.
-load_dotenv()
 
-def env(key: str, default: str | None = None) -> str:
-    value = os.getenv(key, default)
-    if value is None or value == "":
-        sys.exit(f"Missing {key} — set it in .env")
-    return value
-
-MARIADB = dict(
-    host=env("INFORM_HOST"),
-    port=int(env("INFORM_PORT", "3306")),
-    user=env("INFORM_USER"),
-    password=env("INFORM_PASSWORD"),
-    database=env("INFORM_DB"),
-)
-
-POSTGRES = dict(
-    host=env("DW_HOST"),
-    port=int(env("DW_PORT", "5432")),
-    user=env("DW_USER"),
-    password=env("DW_PASSWORD"),
-    dbname=env("DW_DB"),
-)
-
-SOURCE_TABLE = "ecom_order"
-
-RAW_SCHEMA = "staging"
 DEST_SCHEMA = "staging"
-DEST_TABLE = "stg_inform_ecom_order"
-DATE_EXPR = "COALESCE(updated_at, created_at)"
-
-
-# -----------------------------------------
-
 
 target_date = date.today() - timedelta(days=1)
+
 print(f"Pulling data for date: {target_date}")
 
-mysql_conn = pymysql.connect(**MARIADB, cursorclass=pymysql.cursors.DictCursor)
-pg_conn = psycopg2.connect(**POSTGRES)
 
-# 1. Pull yesterday's rows from MariaDB (by updated_at, falling back to created_at)
-with mysql_conn.cursor() as cur:
-    cur.execute(
-        f"SELECT * FROM {SOURCE_TABLE} WHERE DATE({DATE_EXPR}) = %s",
-        (target_date,),
+# ==============================
+# SQL ECOM ORDER
+# ==============================
+
+sql_order = """
+    SELECT *
+    FROM ecom_order
+    WHERE DATE(COALESCE(updated_at, created_at)) = %s
+"""
+
+
+# ==============================
+# SQL ECOM ORDER DETAIL
+# ==============================
+
+sql_order_detail = """
+    SELECT d.*
+    FROM ecom_order o
+    INNER JOIN ecom_order_detail d ON o.order_id = d.order_id
+    WHERE DATE(COALESCE(o.updated_at, o.created_at)) = %s
+"""
+
+
+# ==============================
+# CONNECT
+# ==============================
+
+resource = Resource()
+
+try:
+
+    resource.connect()
+
+
+    # ==========================
+    # 1. ECOM ORDER
+    # ==========================
+
+    print("\nSyncing ecom_order...")
+
+    rows_order = resource.pull_by_date(
+        sql_order,
+        target_date
     )
-    rows = cur.fetchall()
 
-print(f"Rows pulled: {len(rows)}")
+    resource.insert_postgres(
+        rows_order,
+        DEST_SCHEMA,
+        "stg_inform_ecom_order"
+    )
 
-# 2. Insert into Postgres (no dedup — duplicates OK for now)
-if rows:
-    columns = list(rows[0].keys())
-    values = [[row[c] for c in columns] for row in rows]
 
-    query = f"""
-        INSERT INTO {DEST_SCHEMA}.{DEST_TABLE} ({", ".join(f'"{c}"' for c in columns)})
-        VALUES %s
-    """
-    with pg_conn.cursor() as cur:
-        execute_values(cur, query, values)
-    pg_conn.commit()
-    print(f"Inserted {len(rows)} rows into {DEST_SCHEMA}.{DEST_TABLE}")
+    # ==========================
+    # 2. ECOM ORDER DETAIL
+    # ==========================
 
-mysql_conn.close()
-pg_conn.close()
+    print("\nSyncing ecom_order_detail...")
 
+    rows_detail = resource.pull_by_date(
+        sql_order_detail,
+        target_date
+    )
+
+    resource.insert_postgres(
+        rows_detail,
+        DEST_SCHEMA,
+        "stg_inform_ecom_order_detail"
+    )
+
+
+finally:
+
+    resource.close()

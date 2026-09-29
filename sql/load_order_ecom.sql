@@ -43,9 +43,9 @@ a.delivery_at AS warehouse_date,
 '' AS return_name,
 'ecom_order_inform' AS data_source,
 a.updated_at
-FROM ecom_order a
-INNER JOIN ecom_order_detail  b ON a.order_id = b.order_id
-INNER JOIN ecom_order_detail c ON b.id = c.parent_id
+FROM stg_inform_ecom_order a
+INNER JOIN stg_inform_ecom_order_detail b ON a.order_id = b.order_id
+INNER JOIN stg_inform_ecom_order_detail c ON b.id = c.parent_id
 WHERE (
     DATE(a.created_at) = %s
     OR DATE(a.updated_at) = %s
