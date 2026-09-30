@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-SQL_DIR = PROJECT_ROOT / "sql"
+SQL_DIR = BASE_DIR / "sql"
 
 from helper.class_resource import Resource
 
@@ -30,6 +30,17 @@ sql_order = """
 """
 
 
+# ==============================
+# SQL ECOM ORDER DETAIL
+# ==============================
+
+sql_order_detail = """
+    SELECT d.*
+    FROM ecom_order o
+    INNER JOIN ecom_order_detail d ON o.order_id = d.order_id
+    WHERE DATE(COALESCE(o.updated_at, o.created_at)) = %s
+"""
+
 
 # ==============================
 # CONNECT
@@ -38,13 +49,12 @@ sql_order = """
 resource = Resource()
 
 try:
-    # ==========================================
-    # 1. Connect DB
-    # ==========================================
+
     resource.connect()
 
+
     # ==========================
-    # 2. MariaDB -> RAW
+    # 1. ECOM ORDER
     # ==========================
 
     print("\nSyncing ecom_order...")
@@ -61,14 +71,32 @@ try:
     )
 
 
+    # ==========================
+    # 2. ECOM ORDER DETAIL
+    # ==========================
+
+    print("\nSyncing ecom_order_detail...")
+
+    rows_detail = resource.pull_by_date(
+        sql_order_detail,
+        target_date
+    )
+
+    resource.insert_postgres(
+        rows_detail,
+        DEST_SCHEMA,
+        "stg_inform_ecom_order_detail"
+    )
+
     # ==========================================
     # 3. RAW -> FINAL
     # ==========================================
 
     resource.execute_postgres_sql(
-        SQL_DIR / "load_final_table.sql"
+        SQL_DIR / "load_final_order.sql"
     )
 
 
 finally:
     resource.close()
+    

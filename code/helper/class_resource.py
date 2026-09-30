@@ -5,6 +5,7 @@ import pymysql
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import execute_values
+from pathlib import Path
 
 
 load_dotenv()
@@ -45,6 +46,10 @@ class Resource:
         return value
 
 
+    # ==================================================
+    # CONNECT DATABASE
+    # ==================================================
+
     def connect(self):
 
         self.mysql_conn = pymysql.connect(
@@ -56,6 +61,12 @@ class Resource:
             **self.POSTGRES
         )
 
+        print("Database connected")
+
+
+    # ==================================================
+    # PULL DATA FROM MARIADB
+    # ==================================================
 
     def pull_by_date(self, query, target_date):
 
@@ -73,12 +84,17 @@ class Resource:
         return rows
 
 
+    # ==================================================
+    # INSERT INTO POSTGRES RAW
+    # ==================================================
+
     def insert_postgres(
         self,
         rows,
         dest_schema,
         dest_table
     ):
+
         if not rows:
             print("No rows to insert")
             return 0
@@ -100,22 +116,73 @@ class Resource:
             VALUES %s
         """
 
-        with self.pg_conn.cursor() as cur:
-            execute_values(
-                cur,
-                query,
-                values
+        try:
+
+            with self.pg_conn.cursor() as cur:
+
+                execute_values(
+                    cur,
+                    query,
+                    values
+                )
+
+            self.pg_conn.commit()
+
+            print(
+                f"Inserted {len(rows)} rows into: "
+                f"{dest_schema}.{dest_table}"
             )
 
-        self.pg_conn.commit()
+            return len(rows)
 
-        print(
-            f"Inserted {len(rows)} rows into raw "
-            f"{dest_schema}.{dest_table}"
+        except Exception:
+
+            self.pg_conn.rollback()
+            raise
+
+
+    # ==================================================
+    # EXECUTE POSTGRES SQL FILE
+    # ==================================================
+
+    def execute_postgres_sql(self, sql_file):
+
+        sql_file = Path(sql_file)
+
+        if not sql_file.exists():
+            raise FileNotFoundError(
+                f"SQL file not found: {sql_file}"
+            )
+
+        sql = sql_file.read_text(
+            encoding="utf-8"
         )
 
-        return len(rows)
+        try:
 
+            with self.pg_conn.cursor() as cur:
+                cur.execute(sql)
+
+            self.pg_conn.commit()
+
+            print(
+                f"Executed SQL: {sql_file.name}"
+            )
+
+        except Exception:
+
+            self.pg_conn.rollback()
+
+            print(
+                f"Failed SQL: {sql_file.name}"
+            )
+
+            raise
+
+
+    # ==================================================
+    # CLOSE DATABASE
+    # ==================================================
 
     def close(self):
 
@@ -124,3 +191,5 @@ class Resource:
 
         if self.pg_conn:
             self.pg_conn.close()
+
+        print("Database connections closed")
