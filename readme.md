@@ -4,27 +4,20 @@
 
 ```text
 ├── code/
-│   ├── __init__.py
+│   ├── helper/   
+│   │   └── class_resource.py
 │   └── sync_inform_order.py
 │
-├── flow/
+├── docs/
 │   └── order_etl_flow.md
-│
-├── helper/
-│   ├── __pycache__/
-│   └── class_resource.py
-│
-├── sample/
-│   └── sync_sample.py
 │
 ├── sql/
 │
 ├── .gitignore
 ├── readme.md
-└── .env
+
     # Database credentials
 ```
-
 
 
 ## 2. Class Resource Logic
