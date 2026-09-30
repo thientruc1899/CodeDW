@@ -66,7 +66,7 @@ try:
     # ==========================================
 
     resource.execute_postgres_sql(
-        SQL_DIR / "load_final_table.sql"
+        SQL_DIR / "load_final_order_ecom.sql"
     )
 
 
