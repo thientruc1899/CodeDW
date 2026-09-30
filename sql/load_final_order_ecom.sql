@@ -8,7 +8,7 @@
 -- CREATE UNIQUE INDEX IF NOT EXISTS ux_final_ecom_order_id
 --     ON staging.final_inform_ecom_order (id);
 -- ------------------------------------------------------------
-CREATE TEMP TABLE tmp_changed_order_ids
+CREATE TEMP TABLE tmp_changed_ecom_order_ids
 ON COMMIT DROP
 AS
 SELECT DISTINCT id
@@ -16,7 +16,7 @@ FROM staging.stg_inform_ecom_order
 WHERE loaded_at >= CURRENT_DATE - INTERVAL '2 days';
 
 -- Temp table mới tạo chưa có thống kê -> planner đoán sai, join rất chậm.
-ANALYZE tmp_changed_order_ids;
+ANALYZE tmp_changed_ecom_order_ids;
 
 INSERT INTO staging.final_inform_ecom_order (
     id,
@@ -105,7 +105,7 @@ FROM (
                 r.ctid      DESC
         ) AS rn
     FROM staging.stg_inform_ecom_order r
-    INNER JOIN tmp_changed_order_ids c
+    INNER JOIN tmp_changed_ecom_order_ids c
         ON r.id = c.id
 ) ranked
 WHERE rn = 1;

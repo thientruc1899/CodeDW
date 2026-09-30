@@ -58,7 +58,7 @@ try:
     resource.insert_postgres(
         rows_order,
         DEST_SCHEMA,
-        "stg_inform_ecom_order"
+        "stg_inform_ecom_order_detail"
     )
 
 
@@ -67,7 +67,7 @@ try:
     # ==========================================
 
     resource.execute_postgres_sql(
-        SQL_DIR / "load_final_table.sql"
+        SQL_DIR / "load_final_order_ecom_detail.sql"
     )
 
 

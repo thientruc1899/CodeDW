@@ -59,3 +59,42 @@ AND a.status NOT IN(-1);
 ALTER TABLE stg_inform_ecom_order_detail
   ALTER COLUMN loaded_at TYPE timestamp(0),
   ALTER COLUMN loaded_at SET DEFAULT date_trunc('second', CURRENT_TIMESTAMP);
+
+
+
+
+
+CREATE TABLE staging.final_inform_ecom_order_detail AS
+SELECT
+    id, 
+    parent_id, 
+    order_id, 
+    code, 
+    old_sku, 
+    new_sku, 
+    name, 
+    origin_price, 
+    paid_price, 
+    net_price, 
+    quan, 
+    refund_quan, 
+    cb_quan, 
+    canceled, 
+    barcode, 
+    item_id, 
+    manual, 
+    pos, 
+    product_variant_id, 
+    wh_code, 
+    created_at, 
+    loaded_at
+FROM (
+    SELECT
+        r.*,
+        ROW_NUMBER() OVER (
+            PARTITION BY id
+            ORDER BY loaded_at DESC
+        ) AS rn
+    FROM staging.stg_inform_ecom_order_detail r
+) ranked
+WHERE rn = 1;
