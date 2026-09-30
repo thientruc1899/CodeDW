@@ -1,12 +1,10 @@
 import os
-import sys
+from pathlib import Path
 
 import pymysql
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import execute_values
-from pathlib import Path
-
 
 load_dotenv()
 
@@ -14,86 +12,55 @@ load_dotenv()
 class Resource:
 
     def __init__(self):
-
-        self.MARIADB = dict(
-            host=self.env("INFORM_HOST"),
-            port=int(self.env("INFORM_PORT", "3306")),
-            user=self.env("INFORM_USER"),
-            password=self.env("INFORM_PASSWORD"),
-            database=self.env("INFORM_DB"),
-        )
-
-        self.POSTGRES = dict(
-            host=self.env("DW_HOST"),
-            port=int(self.env("DW_PORT", "5432")),
-            user=self.env("DW_USER"),
-            password=self.env("DW_PASSWORD"),
-            dbname=self.env("DW_DB"),
-        )
-
         self.mysql_conn = None
         self.pg_conn = None
 
-
-    @staticmethod
-    def env(key, default=None):
-
-        value = os.getenv(key, default)
-
-        if value is None or value == "":
-            sys.exit(f"Missing {key} — set it in .env")
-
-        return value
-
-
     # ==================================================
-    # CONNECT DATABASE
+    # CONNECT
     # ==================================================
 
     def connect(self):
 
         self.mysql_conn = pymysql.connect(
-            **self.MARIADB,
-            cursorclass=pymysql.cursors.DictCursor
+            host=os.getenv("INFORM_HOST"),
+            port=int(os.getenv("INFORM_PORT", "3306")),
+            user=os.getenv("INFORM_USER"),
+            password=os.getenv("INFORM_PASSWORD"),
+            database=os.getenv("INFORM_DB"),
+            charset="utf8mb4",
+            cursorclass=pymysql.cursors.DictCursor,
         )
 
         self.pg_conn = psycopg2.connect(
-            **self.POSTGRES
+            host=os.getenv("DW_HOST"),
+            port=int(os.getenv("DW_PORT", "5432")),
+            user=os.getenv("DW_USER"),
+            password=os.getenv("DW_PASSWORD"),
+            dbname=os.getenv("DW_DB"),
+            options="-c timezone=Asia/Ho_Chi_Minh",   # để CURRENT_DATE đúng giờ VN
         )
 
         print("Database connected")
 
-
     # ==================================================
-    # PULL DATA FROM MARIADB
+    # MARIADB -> RAM
     # ==================================================
 
     def pull_by_date(self, query, target_date):
 
         with self.mysql_conn.cursor() as cur:
-
-            cur.execute(
-                query,
-                (target_date,)
-            )
-
+            cur.execute(query, (target_date,))
             rows = cur.fetchall()
 
         print(f"Rows pulled: {len(rows)}")
 
         return rows
 
-
     # ==================================================
-    # INSERT INTO POSTGRES RAW
+    # RAM -> POSTGRES
     # ==================================================
 
-    def insert_postgres(
-        self,
-        rows,
-        dest_schema,
-        dest_table
-    ):
+    def insert_postgres(self, rows, dest_schema, dest_table):
 
         if not rows:
             print("No rows to insert")
@@ -106,9 +73,7 @@ class Resource:
             for row in rows
         ]
 
-        column_sql = ", ".join(
-            f'"{c}"' for c in columns
-        )
+        column_sql = ", ".join(f'"{c}"' for c in columns)
 
         query = f"""
             INSERT INTO {dest_schema}.{dest_table}
@@ -116,80 +81,46 @@ class Resource:
             VALUES %s
         """
 
-        try:
+        with self.pg_conn.cursor() as cur:
+            execute_values(cur, query, values, page_size=1000)
 
-            with self.pg_conn.cursor() as cur:
+        self.pg_conn.commit()
 
-                execute_values(
-                    cur,
-                    query,
-                    values
-                )
+        print(f"Inserted {len(rows)} rows into {dest_schema}.{dest_table}")
 
-            self.pg_conn.commit()
-
-            print(
-                f"Inserted {len(rows)} rows into: "
-                f"{dest_schema}.{dest_table}"
-            )
-
-            return len(rows)
-
-        except Exception:
-
-            self.pg_conn.rollback()
-            raise
-
+        return len(rows)
 
     # ==================================================
-    # EXECUTE POSTGRES SQL FILE
+    # RUN SQL LOAD TO FINAL TABLE
     # ==================================================
 
     def execute_postgres_sql(self, sql_file):
 
         sql_file = Path(sql_file)
+        sql = sql_file.read_text(encoding="utf-8")
 
-        if not sql_file.exists():
-            raise FileNotFoundError(
-                f"SQL file not found: {sql_file}"
-            )
+        with self.pg_conn.cursor() as cur:
+            cur.execute(sql)
 
-        sql = sql_file.read_text(
-            encoding="utf-8"
-        )
+        self.pg_conn.commit()
 
-        try:
-
-            with self.pg_conn.cursor() as cur:
-                cur.execute(sql)
-
-            self.pg_conn.commit()
-
-            print(
-                f"Executed SQL: {sql_file.name}"
-            )
-
-        except Exception:
-
-            self.pg_conn.rollback()
-
-            print(
-                f"Failed SQL: {sql_file.name}"
-            )
-
-            raise
-
+        print(f"Executed SQL: {sql_file.name}")
 
     # ==================================================
-    # CLOSE DATABASE
+    # CLOSE
     # ==================================================
 
     def close(self):
+        try:
+            if self.mysql_conn:
+                self.mysql_conn.close()
+        except Exception as e:
+            print(f"Error closing mysql: {e}")
 
-        if self.mysql_conn:
-            self.mysql_conn.close()
-
-        if self.pg_conn:
-            self.pg_conn.close()
+        try:
+            if self.pg_conn:
+                self.pg_conn.close()
+        except Exception as e:
+            print(f"Error closing postgres: {e}")
 
         print("Database connections closed")

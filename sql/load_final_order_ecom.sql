@@ -1,17 +1,33 @@
+
+-- CREATE INDEX IF NOT EXISTS ix_stg_ecom_order_loaded_at
+--     ON staging.stg_inform_ecom_order (loaded_at);
+--
+-- CREATE INDEX IF NOT EXISTS ix_stg_ecom_order_id
+--     ON staging.stg_inform_ecom_order (id);
+--
+-- CREATE UNIQUE INDEX IF NOT EXISTS ux_final_ecom_order_id
+--     ON staging.final_inform_ecom_order (id);
+-- ------------------------------------------------------------
 CREATE TEMP TABLE tmp_changed_order_ids
 ON COMMIT DROP
 AS
 SELECT DISTINCT id
 FROM staging.stg_inform_ecom_order
-WHERE loaded_at >= CURRENT_DATE
-  AND loaded_at < CURRENT_DATE + INTERVAL '1 day';
+WHERE loaded_at >= CURRENT_DATE - INTERVAL '2 days';
+
+-- Temp table mới tạo chưa có thống kê -> planner đoán sai, join rất chậm.
+ANALYZE tmp_changed_order_ids;
 
 
+-- 2. Xoá bản cũ của đúng những id đó.
 DELETE FROM staging.final_inform_ecom_order f
 USING tmp_changed_order_ids c
 WHERE f.id = c.id;
 
 
+-- 3. Ghi lại bản mới nhất của từng id.
+--    Xét toàn bộ lịch sử staging của id đó (không chỉ 2 ngày) để chắc chắn
+--    lấy đúng bản mới nhất.
 INSERT INTO staging.final_inform_ecom_order (
     id,
     order_id,
@@ -95,8 +111,8 @@ FROM (
         ROW_NUMBER() OVER (
             PARTITION BY r.id
             ORDER BY
-                r.updated_at DESC NULLS LAST,
-                r.loaded_at DESC
+                r.loaded_at DESC,
+                r.ctid      DESC
         ) AS rn
     FROM staging.stg_inform_ecom_order r
     INNER JOIN tmp_changed_order_ids c
