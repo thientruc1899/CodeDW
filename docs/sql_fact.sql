@@ -52,4 +52,10 @@ WHERE (
 )
 AND c.id IS NOT NULL
 AND c.canceled = 0
-AND a.status NOT IN(-1)
+AND a.status NOT IN(-1);
+
+
+
+ALTER TABLE stg_inform_ecom_order_detail
+  ALTER COLUMN loaded_at TYPE timestamp(0),
+  ALTER COLUMN loaded_at SET DEFAULT date_trunc('second', CURRENT_TIMESTAMP);

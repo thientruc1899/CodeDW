@@ -1,3 +1,5 @@
+
+
 CREATE TABLE staging.stg_inform_ecom_order_detail (
     id VARCHAR(36) NOT NULL,
     parent_id VARCHAR(36),
