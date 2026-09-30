@@ -48,9 +48,9 @@ Creates database connections once at the beginning of the sync process.
 ```text
 .env
   │
-  ├── INFORM_* ──► MariaDB
+  ├── MariaDB
   │
-  └── DW_* ──────► PostgreSQL
+  └── PostgreSQL
 ```
 
 **`pull_by_date(sql, target_date)`**
@@ -95,73 +95,35 @@ Closes both MariaDB and PostgreSQL connections after all sync jobs have complete
 `sync_inform_ecom.py` controls the execution order.
 
 ```text
-                    sync_inform_ecom.py
-                            │
-                            ▼
-                     Resource()
-                            │
-                            ▼
-                       connect()
-                            │
-             ┌──────────────┴──────────────┐
-             │                             │
-             ▼                             ▼
-      ecom_order.sql              ecom_order_detail.sql
-             │                             │
-             ▼                             ▼
-      pull_by_date()               pull_by_date()
-             │                             │
-             ▼                             ▼
-   MariaDB ecom_order         MariaDB ecom_order_detail
-             │                             │
-             ▼                             ▼
-     insert_postgres()            insert_postgres()
-             │                             │
-             ▼                             ▼
-stg_inform_ecom_order    stg_inform_ecom_order_detail
-             │                             │
-             └──────────────┬──────────────┘
-                            │
-                            ▼
-                         close()
+sync_order.py
+   │
+   ▼
+Resource()
+   │
+   ▼
+connect()
+   │                            
+   ▼                             
+Read sql              
+   │                            
+   ▼                            
+pull_by_date()             
+   │                       
+   ▼                            
+MariaDB         
+   │                         
+   ▼                           
+insert_postgres()            
+   │                           
+   ▼                            
+Table stg_order    
+   │
+   ▼
+close()
+
 ```
 
-## 4. Execution Sequence
-
-```text
-START
-  │
-  ▼
-Load .env
-  │
-  ▼
-Create Resource
-  │
-  ▼
-Connect MariaDB + PostgreSQL
-  │
-  ├─────────────────────────────────────┐
-  │                                     │
-  ▼                                     ▼
-Load ecom_order.sql          Load ecom_order_detail.sql
-  │                                     │
-  ▼                                     ▼
-Pull order by date           Pull order_detail by date
-  │                                     │
-  ▼                                     ▼
-Insert into                  Insert into
-stg_inform_ecom_order        stg_inform_ecom_order_detail
-  │                                     │
-  └──────────────────┬──────────────────┘
-                     │
-                     ▼
-              Close connections
-                     │
-                     ▼
-                    END
-```
-
-## 5. Data Flow
+## 4. Data Flow
 
 ```mermaid
 flowchart LR
@@ -202,7 +164,7 @@ flowchart LR
     G --> H
 ```
 
-## 6. Design Principle
+## 5. Design Principle
 
 The responsibilities are separated into three layers:
 
@@ -217,38 +179,16 @@ Resource Layer
    │
    │ Defines HOW to connect, pull and insert
    ▼
-helper/class_resource.py
+code/helper/class_resource.py
 
 Orchestration Layer
    │
    │ Defines WHEN and IN WHAT ORDER jobs run
    ▼
-sync_inform_ecom.py
+code/sync_inform_ecom.py
 ```
 
-This separation keeps database handling reusable while allowing each SQL query to be maintained independently.
 
-## 8. Overall Architecture
-
-```text
-                        .env
-                          │
-                          ▼
-                 class_resource.py
-                ┌─────────┴─────────┐
-                ▼                   ▼
-             MariaDB            PostgreSQL
-                ▲                   ▲
-                │                   │
-        pull_by_date()       insert_postgres()
-                ▲                   ▲
-                │                   │
-                └──── sync_inform_ecom.py
-                           ▲
-                     ┌─────┴─────┐
-                     │           │
-              ecom_order.sql  ecom_order_detail.sql
-```
 
 ### Core Rule
 
