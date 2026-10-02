@@ -1,7 +1,7 @@
 WITH changed_ids AS (
     SELECT DISTINCT id
     FROM staging.stg_inform_ecom_order
-    WHERE loaded_at >= CURRENT_DATE - INTERVAL '2 days'
+    WHERE loaded_at >= CURRENT_DATE - INTERVAL '1 hours'
 ),
 ranked AS (
     SELECT

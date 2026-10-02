@@ -1,13 +1,6 @@
-"""
-Job: Inform (MariaDB) -> staging.stg_inform_ecom_order -> staging.final_inform_ecom_order
-
-Run:    
-    python code/sync_ecom_order.py
-"""
-
 import sys
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -16,20 +9,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 SQL_DIR = PROJECT_ROOT / "sql"
 
-from helper.class_resource import Resource
-
-
-
+from helper.class_resource_range_date import Resource
 
 
 DEST_SCHEMA = "staging"
 DEST_TABLE = "stg_inform_ecom_order"
 
-
-target_date = date.today() - timedelta(days=1)
-# ==============================
-# SQL
-# ==============================
 
 COLUMNS = """
     id,
@@ -70,52 +55,40 @@ COLUMNS = """
     package_code
 """
 
+
 SQL_ORDER = f"""
-    SELECT {COLUMNS}
-    FROM ecom_order
-    WHERE DATE(COALESCE(updated_at, created_at)) = %s 
+SELECT
+    {COLUMNS}
+FROM ecom_order
+WHERE created_at >= %s
+  AND created_at < %s
 """
 
+start_date = date(2026, 9, 1)
+end_date = date(2026, 10, 1)
 
-# ==============================
-# RUN
-# ==============================
-
-print(f"Pulling data for date: {target_date}")
 
 
 resource = Resource()
- 
+
 try:
-    # ==========================================
-    # 1. Connect DB
-    # ==========================================
     resource.connect()
 
-    # ==========================
-    # 2. MariaDB -> RAW
-    # ==========================
- 
-    print("\nSyncing ecom_order...")
- 
-    rows_order = resource.pull_by_date(
-        SQL_ORDER,
-        target_date
-    )
- 
+    print("Syncing ecom_order for 2026-09...")
+
+    rows_order = resource.pull_by_params(SQL_ORDER,  (start_date, end_date) )
+
     resource.insert_postgres(
         rows_order,
         DEST_SCHEMA,
-        "stg_inform_ecom_order"
+        DEST_TABLE
     )
-     # ==========================================
-    # 3. RAW -> FINAL
-    # ==========================================
 
     resource.execute_postgres_sql(
         SQL_DIR / "load_final_order_ecom.sql"
     )
- 
+
+    print("Sync completed.")
+
 finally:
     resource.close()
-
