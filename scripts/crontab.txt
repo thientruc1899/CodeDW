@@ -1,0 +1,8 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# [DW] Pipeline — 8h30 sáng hằng ngày
+00 1,9,17 * * * flock -n /tmp/elt-bi.lock /home/bi/elt-bi/scripts/run_pipeline.sh
+
+# [Ops] Xóa log cũ hơn 30 ngày — 3h sáng Chủ nhật
+0 3 * * 0 find /home/bi/elt-bi/logs -name "*.log" -mtime +10 -delete
